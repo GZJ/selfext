@@ -118,7 +118,7 @@ go_build:
 	GIT_BRANCH=`git rev-parse --abbrev-ref HEAD` && \
 	BUILD_DATE=`date -u +%Y-%m-%dT%H:%M:%SZ` && \
 	env GOOS=$${OS} GOARCH=$${ARCH} go build -ldflags "\
-		-X 'github.com/gzj/selfext/internal/version.gitVersion=v$${GIT_VERSION}' \
+		-X 'github.com/gzj/selfext/internal/version.gitVersion=$${GIT_VERSION}' \
 		-X 'github.com/gzj/selfext/internal/version.gitCommit=$${GIT_COMMIT}' \
 		-X 'github.com/gzj/selfext/internal/version.gitBranch=$${GIT_BRANCH}' \
 		-X 'github.com/gzj/selfext/internal/version.buildDate=$${BUILD_DATE}' \
