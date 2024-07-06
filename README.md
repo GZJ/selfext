@@ -44,7 +44,7 @@ This will generate `example.zip.exe`, which extracts `example.zip` into the `exa
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License. See the [LICENSE](https://github.com/GZJ/selfext/blob/master/LICENSE) file for details.
 
 ## Author
 
