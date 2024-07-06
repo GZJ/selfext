@@ -146,7 +146,7 @@ func main() {
 	if archive != "" {
 		tmpDir, err := os.MkdirTemp("", "selfext_wrapper")
 		if err != nil {
-			log.Error("create temp dir error", log.Any("error", err))
+			log.Error("create temp dir error...", log.Any("error", err))
 			os.Exit(0)
 		}
 		defer os.RemoveAll(tmpDir)
@@ -159,14 +159,17 @@ func main() {
 		A.AssetsWrapperExtract(tmpDir)
 
 		dstPath, _ := expandPath(path.Join(wrapperPath, archiveName))
+        log.Info("Copying the archive to the temp directory.", "archive name", archiveName, "temp path", dstPath)
 		err = copyFile(archive, dstPath)
 		if err != nil {
 			log.Error("copy archive to temp dir", log.Any("error", err))
 			os.Exit(0)
 		}
 
+        log.Info("Generating wrapper...")
 		G.Run(wrapperPath, []string{"run", filepath.Join(wrapperPath, "wrapper_generator.go"), "--file", archiveName})
 
+        log.Info("Building self-extracting archive...")
 		G.Build(filepath.Join(wrapperPath, "wrapper.go"), filepath.Join(archivePath, archiveName+".exe"), exeOS, exeArch)
 	}
 }
