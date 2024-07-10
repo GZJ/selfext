@@ -1,6 +1,6 @@
 # selfext
 
-**selfext** is a cross-platform tool that turns any compressed file into a self-extracting file.
+Selfext is a cross-platform tool that turns any compressed file into a self-extracting file. It integrates the Golang SDK to generate self-extracting files compatible with multiple platforms.
 
 ## Security Notice!!!
 
