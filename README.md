@@ -29,6 +29,7 @@ To turn `example.zip` into a self-extracting file, run:
 
 ```sh
 selfext example.zip
+selfext --archive example.zip --os darwin --arch arm64
 ```
 
 This will generate `example.zip.exe`, which extracts `example.zip` into the `example` directory when run.
