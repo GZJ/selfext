@@ -2,6 +2,8 @@
 
 Selfext is a cross-platform tool that turns any compressed file into a self-extracting file. It integrates the Golang SDK to generate self-extracting files compatible with multiple platforms.
 
+![selfextg](./selfextg.png)
+
 ## Security Notice!!!
 
 - Be cautious about running executable files sent by others.
