@@ -147,7 +147,7 @@ func main() {
 		tmpDir, err := os.MkdirTemp("", "selfext_wrapper")
 		if err != nil {
 			log.Error("create temp dir error...", log.Any("error", err))
-			os.Exit(0)
+			os.Exit(1)
 		}
 		defer os.RemoveAll(tmpDir)
 
@@ -163,7 +163,7 @@ func main() {
 		err = copyFile(archive, dstPath)
 		if err != nil {
 			log.Error("copy archive to temp dir", log.Any("error", err))
-			os.Exit(0)
+			os.Exit(1)
 		}
 
 		log.Info("Generating wrapper...")
