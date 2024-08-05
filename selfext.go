@@ -23,11 +23,11 @@ type Go struct {
 	Root string
 }
 
-func (g *Go) Build(src, dst, os, arch string) {
-	log.Debug("Starting go build", "src", src, "dst", dst, "os", os, "arch", arch)
+func (g *Go) Build(src, dst, targetOS, targetArch string) {
+	log.Debug("Starting go build", "src", src, "dst", dst, "targetOS", targetOS, "targetArch", targetArch)
 
 	cmd := exec.Command(g.Bin, "build", "-o", dst, src)
-	cmd.Env = append(cmd.Environ(), "GOOS="+os, "GOARCH="+arch)
+	cmd.Env = append(cmd.Environ(), "GOOS="+targetOS, "GOARCH="+targetArch)
 	cmd.Dir = filepath.Dir(src)
 
 	var out strings.Builder
@@ -46,8 +46,8 @@ func (g *Go) Build(src, dst, os, arch string) {
 	}
 
 	log.Info("go build successful",
-		"os", os,
-		"arch", arch,
+		"targetOS", targetOS,
+		"targetArch", targetArch,
 		"exitCode", cmd.ProcessState.ExitCode())
 	log.Debug("go build output", "stdout", out.String())
 }
