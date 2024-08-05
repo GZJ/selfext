@@ -24,28 +24,61 @@ type Go struct {
 }
 
 func (g *Go) Build(src, dst, os, arch string) {
+	log.Debug("Starting go build", "src", src, "dst", dst, "os", os, "arch", arch)
+
 	cmd := exec.Command(g.Bin, "build", "-o", dst, src)
 	cmd.Env = append(cmd.Environ(), "GOOS="+os, "GOARCH="+arch)
 	cmd.Dir = filepath.Dir(src)
 
 	var out strings.Builder
 	cmd.Stdout = &out
+	cmd.Stderr = &out
+
+	log.Debug("Executing go build command", "command", cmd.String())
+
 	err := cmd.Run()
 	if err != nil {
-		log.Error("go build error", log.Any("error", err))
+		log.Error("go build error",
+			"error", err,
+			"output", out.String(),
+			"exitCode", cmd.ProcessState.ExitCode())
 		os.Exit(1)
 	}
-	log.Info("go build", "os", os, "arch", arch, "stdout", out.String())
+
+	log.Info("go build successful",
+		"os", os,
+		"arch", arch,
+		"exitCode", cmd.ProcessState.ExitCode())
+	log.Debug("go build output", "stdout", out.String())
 }
 
 func (g *Go) Run(execDir string, args []string) {
+	log.Debug("Starting go run", "execDir", execDir, "args", args)
+
 	cmd := exec.Command(g.Bin, args...)
 	cmd.Dir = execDir
+
+	var out strings.Builder
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+
+	log.Debug("Executing go run command", "command", cmd.String())
+
 	err := cmd.Run()
+
 	if err != nil {
-		log.Error("go run error", log.Any("error", err))
+		log.Error("go run error",
+			"error", err,
+			"output", out.String(),
+			"exitCode", cmd.ProcessState.ExitCode())
 		os.Exit(1)
 	}
+
+	log.Info("go run successful",
+		"args", strings.Join(args, " "),
+		"exitCode", cmd.ProcessState.ExitCode())
+
+	log.Debug("go run output", "stdout", out.String())
 }
 
 func init() {
@@ -124,12 +157,14 @@ func main() {
 		exeOS       string
 		exeArch     string
 		versionFlag bool
+		verbose     bool
 	)
 
 	flag.StringVar(&archive, "archive", "", "archive file name (e.g., .zip, .tar.gz)")
 	flag.StringVar(&exeOS, "os", runtime.GOOS, "exe os (default is current OS)")
 	flag.StringVar(&exeArch, "arch", runtime.GOARCH, "exe arch (default is current architecture)")
 	flag.BoolVar(&versionFlag, "version", false, "Print the version number and exit")
+	flag.BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging")
 	flag.Parse()
 
 	a := flag.Args()
@@ -141,6 +176,13 @@ func main() {
 		version.Version()
 		os.Exit(0)
 	}
+
+	logLevel := log.LevelInfo
+	if verbose {
+		logLevel = log.LevelDebug
+	}
+	logger := log.New(log.NewTextHandler(os.Stderr, &log.HandlerOptions{Level: logLevel}))
+	log.SetDefault(logger)
 
 	archive, _ = expandPath(archive)
 
