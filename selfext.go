@@ -161,10 +161,10 @@ func main() {
 	)
 
 	flag.StringVar(&archive, "archive", "", "archive file name (e.g., .zip, .tar.gz)")
-	flag.StringVar(&exeOS, "os", runtime.GOOS, "exe os (default is current OS)")
-	flag.StringVar(&exeArch, "arch", runtime.GOARCH, "exe arch (default is current architecture)")
-	flag.BoolVarP(&versionFlag, "version", "V", false, "Print the version number and exit")
-	flag.BoolVarP(&verbose, "verbose", "v", false, "Enable verbose logging")
+	flag.StringVar(&exeOS, "os", runtime.GOOS, "exe os")
+	flag.StringVar(&exeArch, "arch", runtime.GOARCH, "exe arch")
+	flag.BoolVarP(&versionFlag, "version", "V", false, "print the version number and exit")
+	flag.BoolVarP(&verbose, "verbose", "v", false, "enable verbose logging")
 	flag.Parse()
 
 	a := flag.Args()
