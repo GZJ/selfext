@@ -1,4 +1,5 @@
 import sys
+import os
 import subprocess
 from functools import partial
 from PyQt5.QtWidgets import (
@@ -86,6 +87,24 @@ class DragDropWindow(QMainWindow):
 
         main_layout.addLayout(options_layout)
 
+    def get_selfext_path(self):
+        if getattr(sys, "frozen", False):
+            application_path = sys._MEIPASS
+            if sys.platform.startswith("win"):
+                selfext = "selfext.exe"
+            else:
+                selfext = "selfext"
+            return os.path.join(application_path, selfext)
+        else:
+            if sys.platform.startswith("win"):
+                selfext = "selfext.exe"
+            else:
+                selfext = "selfext"
+            if os.path.exists(selfext):
+                return os.path.abspath(selfext)
+            else:
+                return None
+
     def onOsChanged(self):
         selected_os = self.osComboBox.currentText()
         if selected_os == "darwin":
@@ -100,8 +119,13 @@ class DragDropWindow(QMainWindow):
         selected_os = self.osComboBox.currentText()
         selected_arch = self.archComboBox.currentText()
 
+        selfext_path = self.get_selfext_path()
+        if not selfext_path:
+            QMessageBox.critical(self, "Error", "selfext executable not found!")
+            return
+
         command = [
-            "selfext",
+            selfext_path,
             "--archive",
             archive_path,
             "--os",
