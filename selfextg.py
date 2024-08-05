@@ -1,7 +1,7 @@
 import sys
 import os
+import shutil
 import subprocess
-from functools import partial
 from PyQt5.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -12,9 +12,12 @@ from PyQt5.QtWidgets import (
     QComboBox,
     QPushButton,
     QMessageBox,
+    QDialog,
+    QTextEdit,
+    QFrame,
 )
 from PyQt5.QtCore import Qt, QThread, pyqtSignal
-from PyQt5.QtGui import QDropEvent, QDragEnterEvent, QFont
+from PyQt5.QtGui import QDropEvent, QDragEnterEvent, QFont, QColor, QPalette
 
 
 class DragDropLabel(QLabel):
@@ -34,6 +37,61 @@ class DragDropLabel(QLabel):
             self.setStyleSheet(
                 "border: 2px dashed #aaa; padding: 20px; background-color: white;"
             )
+
+
+class OutputWindow(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.initUI()
+
+    def initUI(self):
+        self.setWindowTitle("Command Output")
+        self.setGeometry(200, 200, 600, 400)
+        layout = QVBoxLayout()
+
+        self.outputConsole = QTextEdit(self)
+        self.outputConsole.setReadOnly(True)
+        self.outputConsole.setFont(QFont("Courier", 10))
+
+        palette = self.outputConsole.palette()
+        palette.setColor(QPalette.Base, QColor(0, 0, 0))
+        palette.setColor(QPalette.Text, QColor(0, 255, 0))
+        self.outputConsole.setPalette(palette)
+        layout.addWidget(self.outputConsole)
+
+        bottom_layout = QHBoxLayout()
+
+        self.statusLabel = QLabel("Executing...", self)
+        self.statusLabel.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        bottom_layout.addWidget(self.statusLabel)
+
+        bottom_layout.addStretch(1)
+
+        self.closeButton = QPushButton("Close", self)
+        self.closeButton.clicked.connect(self.close)
+        self.closeButton.setEnabled(False)
+        bottom_layout.addWidget(self.closeButton)
+
+        line = QFrame()
+        line.setFrameShape(QFrame.HLine)
+        line.setFrameShadow(QFrame.Sunken)
+        layout.addWidget(line)
+
+        layout.addLayout(bottom_layout)
+        self.setLayout(layout)
+
+    def appendOutput(self, text):
+        self.outputConsole.append(text)
+
+    def setStatus(self, success):
+        if success:
+            self.statusLabel.setText("Execution Successful")
+            self.statusLabel.setStyleSheet("color: green;")
+            self.closeButton.setEnabled(True)
+        else:
+            self.statusLabel.setText("Execution Failed")
+            self.statusLabel.setStyleSheet("color: red;")
+            self.closeButton.setEnabled(True)
 
 
 class DragDropWindow(QMainWindow):
@@ -100,8 +158,8 @@ class DragDropWindow(QMainWindow):
                 selfext = "selfext.exe"
             else:
                 selfext = "selfext"
-            if os.path.exists(selfext):
-                return os.path.abspath(selfext)
+            if shutil.which(selfext):
+                return selfext
             else:
                 return None
 
@@ -134,30 +192,32 @@ class DragDropWindow(QMainWindow):
             selected_arch,
         ]
 
+        self.outputWindow = OutputWindow(self)
+        self.outputWindow.show()
+
         self.worker = Worker(command, archive_path)
-        self.worker.finished.connect(
-            partial(self.onCommandFinished, archive_path=archive_path)
-        )
-        self.worker.error.connect(
-            partial(self.onCommandError, archive_path=archive_path)
-        )
+        self.worker.output.connect(self.outputWindow.appendOutput)
+        self.worker.finished.connect(self.onCommandFinished)
+        self.worker.error.connect(self.onCommandError)
         self.worker.start()
 
-    def onCommandFinished(self, output, archive_path):
-        file_name = archive_path.split("/")[-1]
-        success_message = f"{file_name}.exe generated successfully!"
-        print(output)
-        QMessageBox.information(self, "Execution Result", success_message)
+    def onCommandFinished(self, return_code):
+        self.outputWindow.setStatus(return_code == 0)
+        if return_code == 0:
+            file_name = self.archiveLabel.text().split("/")[-1]
+            success_message = f"{file_name}.exe generated successfully!"
+            self.outputWindow.appendOutput(success_message)
+        else:
+            self.outputWindow.appendOutput("Command execution failed.")
 
-    def onCommandError(self, error, archive_path):
-        file_name = archive_path.split("/")[-1]
-        error_message = f"Failed to generate {file_name}.exe!"
-        print(f"Error executing command: {error}")
-        QMessageBox.critical(self, "Execution Result", error_message)
+    def onCommandError(self, error):
+        self.outputWindow.appendOutput(f"Error: {error}")
+        self.outputWindow.setStatus(False)
 
 
 class Worker(QThread):
-    finished = pyqtSignal(str)
+    output = pyqtSignal(str)
+    finished = pyqtSignal(int)
     error = pyqtSignal(str)
 
     def __init__(self, command, archive_path):
@@ -167,12 +227,22 @@ class Worker(QThread):
 
     def run(self):
         try:
-            result = subprocess.run(
-                self.command, capture_output=True, text=True, check=True
+            process = subprocess.Popen(
+                self.command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+                universal_newlines=True,
             )
-            self.finished.emit(result.stdout)
-        except subprocess.CalledProcessError as e:
-            self.error.emit(e.stderr)
+
+            for line in process.stdout:
+                self.output.emit(line.strip())
+
+            return_code = process.wait()
+            self.finished.emit(return_code)
+        except Exception as e:
+            self.error.emit(str(e))
 
 
 if __name__ == "__main__":
