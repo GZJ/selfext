@@ -33,7 +33,7 @@ func (g *Go) Build(src, dst, os, arch string) {
 	err := cmd.Run()
 	if err != nil {
 		log.Error("go build error", log.Any("error", err))
-        os.Exit(1)
+		os.Exit(1)
 	}
 	log.Info("go build", "os", os, "arch", arch, "stdout", out.String())
 }
@@ -44,7 +44,7 @@ func (g *Go) Run(execDir string, args []string) {
 	err := cmd.Run()
 	if err != nil {
 		log.Error("go run error", log.Any("error", err))
-        os.Exit(1)
+		os.Exit(1)
 	}
 }
 
