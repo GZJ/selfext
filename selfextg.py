@@ -2,6 +2,7 @@ import sys
 import os
 import shutil
 import subprocess
+from pathlib import Path
 from PyQt5.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -146,22 +147,43 @@ class DragDropWindow(QMainWindow):
         main_layout.addLayout(options_layout)
 
     def get_selfext_path(self):
+        if sys.platform.startswith("win"):
+            selfext = "selfext.exe"
+        else:
+            selfext = "selfext"
+
         if getattr(sys, "frozen", False):
             application_path = sys._MEIPASS
-            if sys.platform.startswith("win"):
-                selfext = "selfext.exe"
-            else:
-                selfext = "selfext"
-            return os.path.join(application_path, selfext)
+            source_path = os.path.join(application_path, selfext)
+
+            if os.path.exists(source_path):
+                if sys.platform.startswith("win"):
+                    user_config_dir = Path(os.environ["APPDATA"])
+                elif sys.platform.startswith("darwin"):
+                    user_config_dir = Path.home() / "Library" / "Application Support"
+                else:
+                    user_config_dir = Path.home() / ".config"
+
+                selfext_dir = user_config_dir / "selfextg"
+                selfext_dir.mkdir(parents=True, exist_ok=True)
+                dest_path = selfext_dir / selfext
+                print("user config dir: ", user_config_dir)
+                print("selfext src path: ", source_path)
+                print("selfext dst path: ", dest_path)
+
+                if not dest_path.exists():
+                    print("copying ...")
+                    shutil.copy2(source_path, dest_path)
+                    print("copy completed")
+                    if not sys.platform.startswith("win"):
+                        os.chmod(dest_path, 0o755)
+
+                return str(dest_path)
+
+        if shutil.which(selfext):
+            return selfext
         else:
-            if sys.platform.startswith("win"):
-                selfext = "selfext.exe"
-            else:
-                selfext = "selfext"
-            if shutil.which(selfext):
-                return selfext
-            else:
-                return None
+            return None
 
     def onOsChanged(self):
         selected_os = self.osComboBox.currentText()
