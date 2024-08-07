@@ -41,12 +41,13 @@ class DragDropLabel(QLabel):
 
 
 class OutputWindow(QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, file_name, parent=None):
         super().__init__(parent)
+        self.file_name = file_name
         self.initUI()
 
     def initUI(self):
-        self.setWindowTitle("Command Output")
+        self.setWindowTitle(f"selfext: generating {self.file_name}.exe ...")
         self.setGeometry(200, 200, 600, 400)
         layout = QVBoxLayout()
 
@@ -89,10 +90,16 @@ class OutputWindow(QDialog):
             self.statusLabel.setText("Execution Successful")
             self.statusLabel.setStyleSheet("color: green;")
             self.closeButton.setEnabled(True)
+            self.setWindowTitle(
+                f"selfext: {self.file_name}.exe generated successfully."
+            )
         else:
             self.statusLabel.setText("Execution Failed")
             self.statusLabel.setStyleSheet("color: red;")
             self.closeButton.setEnabled(True)
+            self.setWindowTitle(
+                f"selfext: failed to generate {self.file_name}.exe in selfext!!"
+            )
 
 
 class DragDropWindow(QMainWindow):
@@ -214,7 +221,8 @@ class DragDropWindow(QMainWindow):
             selected_arch,
         ]
 
-        self.outputWindow = OutputWindow(self)
+        file_name = os.path.basename(archive_path)
+        self.outputWindow = OutputWindow(file_name, self)
         self.outputWindow.show()
 
         self.worker = Worker(command, archive_path)
