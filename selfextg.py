@@ -106,6 +106,7 @@ class DragDropWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.initUI()
+        self.workers = []
 
     def initUI(self):
         self.setWindowTitle("selfextg")
@@ -222,27 +223,37 @@ class DragDropWindow(QMainWindow):
         ]
 
         file_name = os.path.basename(archive_path)
-        self.outputWindow = OutputWindow(file_name, self)
-        self.outputWindow.show()
+        output_window = OutputWindow(file_name, self)
+        output_window.show()
 
-        self.worker = Worker(command, archive_path)
-        self.worker.output.connect(self.outputWindow.appendOutput)
-        self.worker.finished.connect(self.onCommandFinished)
-        self.worker.error.connect(self.onCommandError)
-        self.worker.start()
+        worker = Worker(command, archive_path)
+        worker.output.connect(output_window.appendOutput)
+        worker.finished.connect(
+            lambda return_code: self.onCommandFinished(return_code, output_window)
+        )
+        worker.error.connect(lambda error: self.onCommandError(error, output_window))
+        worker.start()
 
-    def onCommandFinished(self, return_code):
-        self.outputWindow.setStatus(return_code == 0)
+        self.workers.append(worker)
+
+    def onCommandFinished(self, return_code, output_window):
+        output_window.setStatus(return_code == 0)
         if return_code == 0:
             file_name = self.archiveLabel.text().split("/")[-1]
             success_message = f"{file_name}.exe generated successfully!"
-            self.outputWindow.appendOutput(success_message)
+            output_window.appendOutput(success_message)
         else:
-            self.outputWindow.appendOutput("Command execution failed.")
+            output_window.appendOutput("Command execution failed.")
 
-    def onCommandError(self, error):
-        self.outputWindow.appendOutput(f"Error: {error}")
-        self.outputWindow.setStatus(False)
+    def onCommandError(self, error, output_window):
+        output_window.appendOutput(f"Error: {error}")
+        output_window.setStatus(False)
+
+    def closeEvent(self, event):
+        for worker in self.workers:
+            worker.quit()
+            worker.wait()
+        super().closeEvent(event)
 
 
 class Worker(QThread):
