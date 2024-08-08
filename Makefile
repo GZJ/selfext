@@ -34,7 +34,6 @@ target/$(1)-$(2):
 	$$(MAKE) OS=$(1) ARCH=$(2) GoVersionEmbeded=go$$(GO_VERSION).$(1)-$(2) BIN=selfext_$(1)-$(2)$(if $(filter $(1),$(OS_WINDOWS)),.exe) go_build
 endef
 
-# Define specific targets
 $(eval $(call target-go,$(OS_WINDOWS),$(ARCH_32),$(GO_ARCH_EXT_WIN)))
 $(eval $(call target-go,$(OS_WINDOWS),$(ARCH_64),$(GO_ARCH_EXT_WIN)))
 $(eval $(call target-go,$(OS_WINDOWS),$(ARCH_ARM64),$(GO_ARCH_EXT_WIN)))
@@ -72,7 +71,7 @@ clean:
 	rm -rf assets/wrapper/wrapper.go
 	rm -rf assets/wrapper/wrapper.zip
 
-# ---------------------------- download go------------------------------------------
+# ---------------------------- download go sdk ------------------------------------------
 download_go:
 	mkdir -p assets/go	
 	@echo "Fetching Go version $(GO_VERSION)..."
@@ -90,7 +89,7 @@ download_go:
 		echo "File already exists: assets/go/$${filename}"; \
 	fi
 
-# ---------------------------- generate wrapper arch ------------------------------------------
+# ---------------------------- go run generate wrapper.go ------------------------------------------
 Wrapper_Arch := wrapper.zip
 generate_wrapper:
 	@echo "$(COLOR_GREEN)1. generate wrapper.go......$(COLOR_RESET)"
@@ -104,13 +103,13 @@ generate_wrapper:
 	7z a $(Wrapper_Arch) go.mod go.sum wrapper_generator.go vendor -bso0 -bse0 && \
 	mv go.mod go.mod_ 
 
-# ---------------------------- run assets ------------------------------------------
+# ---------------------------- go run generate assets.go ------------------------------------------
 generate_assets:
 	@echo "$(COLOR_GREEN)2. generate assets.go......$(COLOR_RESET)"
 	cd assets &&  \
 	go run assets_generator.go -go $${Go_Arch} -wrapper $(Wrapper_Arch)
 
-# ---------------------------- go build with flags ------------------------------------------
+# ---------------------------- go build selfext.go with flags ------------------------------------------
 go_build:
 	@echo "$(COLOR_GREEN)3. go build......$(COLOR_RESET)"
 	GIT_VERSION=`git describe --tags --abbrev=0 | tr -d '\n' | sed 's/^v//'` && \
