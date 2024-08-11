@@ -275,6 +275,7 @@ class Worker(QThread):
                 text=True,
                 bufsize=1,
                 universal_newlines=True,
+                creationflags=subprocess.CREATE_NO_WINDOW,
             )
 
             for line in process.stdout:
