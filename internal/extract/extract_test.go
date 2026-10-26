@@ -71,3 +71,39 @@ func TestExistingHardlink(t *testing.T) {
 		t.Fatal("outside file changed")
 	}
 }
+
+func TestArchiveSymlink(t *testing.T) {
+	p := filepath.Join(t.TempDir(), "link.zip")
+	f, err := os.Create(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	z := zip.NewWriter(f)
+	h := &zip.FileHeader{Name: "link"}
+	h.SetMode(os.ModeSymlink | 0777)
+	w, err := z.CreateHeader(h)
+	if err != nil {
+		t.Fatal(err)
+	}
+	w.Write([]byte("../outside"))
+	z.Close()
+	f.Close()
+	if err := Unarchive(p, t.TempDir()); err == nil {
+		t.Fatal("accepted symlink entry")
+	}
+}
+
+func TestExistingFile(t *testing.T) {
+	dst := t.TempDir()
+	p := filepath.Join(dst, "file")
+	if err := os.WriteFile(p, []byte("original"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := Unarchive(archive(t, "file"), dst); err == nil {
+		t.Fatal("overwrote existing file")
+	}
+	got, err := os.ReadFile(p)
+	if err != nil || string(got) != "original" {
+		t.Fatalf("%q: %v", got, err)
+	}
+}

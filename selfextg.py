@@ -2,7 +2,6 @@ import sys
 import os
 import shutil
 import subprocess
-from pathlib import Path
 from PyQt5.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -47,7 +46,7 @@ class OutputWindow(QDialog):
         self.initUI()
 
     def initUI(self):
-        self.setWindowTitle(f"selfext: generating {self.file_name}.exe ...")
+        self.setWindowTitle(f"selfext: generating {self.file_name} ...")
         self.setGeometry(200, 200, 600, 400)
         layout = QVBoxLayout()
 
@@ -91,14 +90,14 @@ class OutputWindow(QDialog):
             self.statusLabel.setStyleSheet("color: green;")
             self.closeButton.setEnabled(True)
             self.setWindowTitle(
-                f"selfext: {self.file_name}.exe generated successfully."
+                f"selfext: {self.file_name} generated successfully."
             )
         else:
             self.statusLabel.setText("Execution Failed")
             self.statusLabel.setStyleSheet("color: red;")
             self.closeButton.setEnabled(True)
             self.setWindowTitle(
-                f"selfext: failed to generate {self.file_name}.exe in selfext!!"
+                f"selfext: failed to generate {self.file_name} in selfext!!"
             )
 
 
@@ -164,29 +163,10 @@ class DragDropWindow(QMainWindow):
             application_path = sys._MEIPASS
             source_path = os.path.join(application_path, selfext)
 
-            if os.path.exists(source_path):
-                if sys.platform.startswith("win"):
-                    user_config_dir = Path(os.environ["APPDATA"])
-                elif sys.platform.startswith("darwin"):
-                    user_config_dir = Path.home() / "Library" / "Application Support"
-                else:
-                    user_config_dir = Path.home() / ".config"
-
-                selfext_dir = user_config_dir / "selfextg"
-                selfext_dir.mkdir(parents=True, exist_ok=True)
-                dest_path = selfext_dir / selfext
-                print("user config dir: ", user_config_dir)
-                print("selfext src path: ", source_path)
-                print("selfext dst path: ", dest_path)
-
-                if not dest_path.exists():
-                    print("copying ...")
-                    shutil.copy2(source_path, dest_path)
-                    print("copy completed")
-                    if not sys.platform.startswith("win"):
-                        os.chmod(dest_path, 0o755)
-
-                return str(dest_path)
+            if os.path.isfile(source_path):
+                # The standalone packager can run directly from PyInstaller's
+                # bundle. No persistent SDK or cached executable is needed.
+                return source_path
 
         if shutil.which(selfext):
             return selfext
@@ -207,11 +187,16 @@ class DragDropWindow(QMainWindow):
         selected_os = self.osComboBox.currentText()
         selected_arch = self.archComboBox.currentText()
 
+        if not os.path.isfile(archive_path):
+            QMessageBox.critical(self, "Error", "Please drop an existing archive file.")
+            return
+
         selfext_path = self.get_selfext_path()
         if not selfext_path:
             QMessageBox.critical(self, "Error", "selfext executable not found!")
             return
 
+        output_path = archive_path + (".exe" if selected_os == "windows" else ".run")
         command = [
             selfext_path,
             "--archive",
@@ -220,9 +205,11 @@ class DragDropWindow(QMainWindow):
             selected_os,
             "--arch",
             selected_arch,
+            "--output",
+            output_path,
         ]
 
-        file_name = os.path.basename(archive_path)
+        file_name = os.path.basename(output_path)
         output_window = OutputWindow(file_name, self)
         output_window.show()
 
@@ -239,8 +226,7 @@ class DragDropWindow(QMainWindow):
     def onCommandFinished(self, return_code, output_window):
         output_window.setStatus(return_code == 0)
         if return_code == 0:
-            file_name = self.archiveLabel.text().split("/")[-1]
-            success_message = f"{file_name}.exe generated successfully!"
+            success_message = f"{output_window.file_name} generated successfully!"
             output_window.appendOutput(success_message)
         else:
             output_window.appendOutput("Command execution failed.")
@@ -275,7 +261,7 @@ class Worker(QThread):
                 text=True,
                 bufsize=1,
                 universal_newlines=True,
-                creationflags=subprocess.CREATE_NO_WINDOW,
+                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform.startswith("win") else 0,
             )
 
             for line in process.stdout:

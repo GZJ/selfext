@@ -1,218 +1,142 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"io"
-	log "log/slog"
 	"os"
-	"os/exec"
-	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
 
-	A "github.com/gzj/selfext/assets"
+	"github.com/gzj/selfext/internal/bundle"
+	"github.com/gzj/selfext/internal/stubs"
 	"github.com/gzj/selfext/internal/version"
+	"github.com/mholt/archives"
 	flag "github.com/spf13/pflag"
 )
 
-var G Go
-
-type Go struct {
-	Bin  string
-	Root string
+func expandPath(p string) (string, error) {
+	if p == "" {
+		return "", errors.New("path cannot be empty")
+	}
+	if p == "~" || strings.HasPrefix(p, "~/") || strings.HasPrefix(p, "~\\") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		if p == "~" {
+			p = home
+		} else {
+			p = filepath.Join(home, p[2:])
+		}
+	}
+	return filepath.Abs(p)
 }
 
-func (g *Go) Build(src, dst, targetOS, targetArch string) {
-	log.Debug("Starting go build", "src", src, "dst", dst, "targetOS", targetOS, "targetArch", targetArch)
-
-	cmd := exec.Command(g.Bin, "build", "-o", dst, src)
-	cmd.Env = append(cmd.Environ(), "GOOS="+targetOS, "GOARCH="+targetArch)
-	cmd.Dir = filepath.Dir(src)
-
-	var out strings.Builder
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-
-	log.Debug("Executing go build command", "command", cmd.String())
-
-	err := cmd.Run()
+func run(args []string, stdout, stderr io.Writer) error {
+	flags := flag.NewFlagSet("selfext", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	archive := flags.String("archive", "", "archive to package (e.g. .zip, .tar.gz)")
+	targetOS := flags.String("os", runtime.GOOS, "target operating system")
+	targetArch := flags.String("arch", runtime.GOARCH, "target architecture")
+	output := flags.StringP("output", "o", "", "output executable path")
+	showVersion := flags.BoolP("version", "V", false, "print version")
+	verbose := flags.BoolP("verbose", "v", false, "show packaging details")
+	if err := flags.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return nil
+		}
+		return err
+	}
+	if *showVersion {
+		fmt.Fprintln(stdout, version.Get().String())
+		return nil
+	}
+	if flags.NArg() > 1 || (flags.NArg() == 1 && *archive != "") {
+		return errors.New("provide one archive, either positional or --archive")
+	}
+	if flags.NArg() == 1 {
+		*archive = flags.Arg(0)
+	}
+	if *archive == "" {
+		return errors.New("archive required: selfext [--os linux --arch amd64] [-o output] archive.zip")
+	}
+	archivePath, err := expandPath(*archive)
 	if err != nil {
-		log.Error("go build error",
-			"error", err,
-			"output", out.String(),
-			"exitCode", cmd.ProcessState.ExitCode())
-		os.Exit(1)
+		return err
 	}
-
-	log.Info("go build successful",
-		"targetOS", targetOS,
-		"targetArch", targetArch,
-		"exitCode", cmd.ProcessState.ExitCode())
-	log.Debug("go build output", "stdout", out.String())
-}
-
-func (g *Go) Run(execDir string, args []string) {
-	log.Debug("Starting go run", "execDir", execDir, "args", args)
-
-	cmd := exec.Command(g.Bin, args...)
-	cmd.Dir = execDir
-
-	var out strings.Builder
-	cmd.Stdout = &out
-	cmd.Stderr = &out
-
-	log.Debug("Executing go run command", "command", cmd.String())
-
-	err := cmd.Run()
-
+	source, err := os.Open(archivePath)
 	if err != nil {
-		log.Error("go run error",
-			"error", err,
-			"output", out.String(),
-			"exitCode", cmd.ProcessState.ExitCode())
-		os.Exit(1)
+		return err
 	}
-
-	log.Info("go run successful",
-		"args", strings.Join(args, " "),
-		"exitCode", cmd.ProcessState.ExitCode())
-
-	log.Debug("go run output", "stdout", out.String())
-}
-
-func init() {
-	userCfgDir, err := os.UserConfigDir()
+	defer source.Close()
+	info, err := source.Stat()
 	if err != nil {
-		log.Error("user config error", log.Any("error", err))
+		return err
 	}
-	dst := filepath.Join(userCfgDir, "selfext", "go")
-	if _, err := os.Stat(dst); os.IsNotExist(err) {
-		A.AssetsGoExtract(filepath.Join(userCfgDir, "selfext"))
+	if !info.Mode().IsRegular() {
+		return errors.New("archive must be a regular file")
 	}
-	var goBin string
-	if runtime.GOOS == "windows" {
-		goBin = filepath.Join(userCfgDir, "selfext", "go", "go", "bin", "go.exe")
-	} else {
-		goBin = filepath.Join(userCfgDir, "selfext", "go", "go", "bin", "go")
-	}
-	goRoot := filepath.Join(userCfgDir, "selfext", "go", "go")
-	G = Go{goBin, goRoot}
-}
-
-func copyFile(src, dst string) error {
-	srcFile, err := os.Open(src)
+	format, _, err := archives.Identify(context.Background(), info.Name(), source)
 	if err != nil {
-		return fmt.Errorf("failed to open source file: %w", err)
+		return fmt.Errorf("identify archive: %w", err)
 	}
-	defer srcFile.Close()
-
-	srcFileInfo, err := srcFile.Stat()
+	if _, ok := format.(archives.Extractor); !ok {
+		return errors.New("input is not a supported archive")
+	}
+	if _, err := source.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	stub, err := stubs.Open(*targetOS, *targetArch)
 	if err != nil {
-		return fmt.Errorf("failed to get source file info: %w", err)
+		return err
 	}
-
-	dstFile, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, srcFileInfo.Mode())
+	defer stub.Close()
+	if *output == "" {
+		if *targetOS == "windows" {
+			*output = archivePath + ".exe"
+		} else {
+			*output = archivePath + ".run"
+		}
+	}
+	outputPath, err := expandPath(*output)
 	if err != nil {
-		return fmt.Errorf("failed to open destination file: %w", err)
+		return err
 	}
-	defer dstFile.Close()
-
-	_, err = io.Copy(dstFile, srcFile)
+	// Exclusive creation never truncates the input, existing output, or a link.
+	out, err := os.OpenFile(outputPath, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0600)
 	if err != nil {
-		return fmt.Errorf("failed to copy file: %w", err)
+		return err
 	}
-
+	complete := false
+	defer func() {
+		out.Close()
+		if !complete {
+			os.Remove(outputPath)
+		}
+	}()
+	if *verbose {
+		fmt.Fprintf(stdout, "Target: %s/%s; archive: %d bytes; using embedded extractor\n", *targetOS, *targetArch, info.Size())
+	}
+	if err := bundle.Write(out, stub, source, bundle.Metadata{ArchiveName: info.Name(), Directory: bundle.Directory(info.Name())}); err != nil {
+		return err
+	}
+	if err := out.Chmod(0755); err != nil {
+		return err
+	}
+	if err := out.Close(); err != nil {
+		return err
+	}
+	complete = true
+	fmt.Fprintf(stdout, "Created %s\n", outputPath)
 	return nil
 }
 
-func expandPath(path string) (string, error) {
-	if len(path) == 0 {
-		return "", fmt.Errorf("path cannot be empty")
-	}
-
-	if path[0] == '~' {
-		homeDir, err := os.UserHomeDir()
-		if err != nil {
-			return "", fmt.Errorf("error getting user home directory: %w", err)
-		}
-		if len(path) > 1 && path[1] == '/' {
-			path = filepath.Join(homeDir, path[2:])
-		} else {
-			path = homeDir
-		}
-	}
-
-	absPath, err := filepath.Abs(path)
-	if err != nil {
-		return "", fmt.Errorf("error getting absolute path: %w", err)
-	}
-
-	return absPath, nil
-}
-
 func main() {
-	var (
-		archive     string
-		exeOS       string
-		exeArch     string
-		versionFlag bool
-		verbose     bool
-	)
-
-	flag.StringVar(&archive, "archive", "", "archive file name (e.g., .zip, .tar.gz)")
-	flag.StringVar(&exeOS, "os", runtime.GOOS, "exe os")
-	flag.StringVar(&exeArch, "arch", runtime.GOARCH, "exe arch")
-	flag.BoolVarP(&versionFlag, "version", "V", false, "print the version number and exit")
-	flag.BoolVarP(&verbose, "verbose", "v", false, "enable verbose logging")
-	flag.Parse()
-
-	a := flag.Args()
-	if len(a) > 0 {
-		archive = a[0]
-	}
-
-	if versionFlag {
-		version.Version()
-		os.Exit(0)
-	}
-
-	logLevel := log.LevelInfo
-	if verbose {
-		logLevel = log.LevelDebug
-	}
-	logger := log.New(log.NewTextHandler(os.Stderr, &log.HandlerOptions{Level: logLevel}))
-	log.SetDefault(logger)
-
-	archive, _ = expandPath(archive)
-
-	if archive != "" {
-		tmpDir, err := os.MkdirTemp("", "selfext_wrapper")
-		if err != nil {
-			log.Error("create temp dir error...", log.Any("error", err))
-			os.Exit(1)
-		}
-		defer os.RemoveAll(tmpDir)
-
-		archivePath := filepath.Dir(archive)
-		archiveName := filepath.Base(archive)
-
-		wrapperPath := filepath.Join(tmpDir, "wrapper")
-
-		A.AssetsWrapperExtract(tmpDir)
-
-		dstPath, _ := expandPath(path.Join(wrapperPath, archiveName))
-		log.Info("Copying the archive to the temp directory.", "archive name", archiveName, "temp path", dstPath)
-		err = copyFile(archive, dstPath)
-		if err != nil {
-			log.Error("copy archive to temp dir", log.Any("error", err))
-			os.Exit(1)
-		}
-
-		log.Info("Generating wrapper...")
-		G.Run(wrapperPath, []string{"run", filepath.Join(wrapperPath, "wrapper_generator.go"), "--file", archiveName})
-
-		log.Info("Building self-extracting archive...")
-		G.Build(filepath.Join(wrapperPath, "wrapper.go"), filepath.Join(archivePath, archiveName+".exe"), exeOS, exeArch)
+	if err := run(os.Args[1:], os.Stdout, os.Stderr); err != nil {
+		fmt.Fprintln(os.Stderr, "selfext:", err)
+		os.Exit(1)
 	}
 }

@@ -19,13 +19,18 @@ func Unarchive(source, destination string) error {
 		return err
 	}
 	defer f.Close()
-	format, reader, err := archives.Identify(context.Background(), source, f)
+	return Reader(f, source, destination)
+}
+
+// Reader extracts directly from a bounded archive section without a temporary copy.
+func Reader(source io.Reader, name, destination string) error {
+	format, reader, err := archives.Identify(context.Background(), name, source)
 	if err != nil {
 		return err
 	}
 	extractor, ok := format.(archives.Extractor)
 	if !ok {
-		return fmt.Errorf("unsupported archive format: %s", source)
+		return fmt.Errorf("unsupported archive format: %s", name)
 	}
 	if err = os.MkdirAll(destination, 0755); err != nil {
 		return err

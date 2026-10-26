@@ -1,2 +1,4 @@
 *.sh text eol=lf
 *.py linguist-detectable=false
+
+/internal/stubs/data/*.gz binary
