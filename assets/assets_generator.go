@@ -1,4 +1,5 @@
-// +build
+//go:build ignore
+// +build ignore
 
 package main
 
@@ -23,7 +24,7 @@ import (
     "embed"
     "path/filepath"
 
-    "github.com/mholt/archiver/v3"
+    "github.com/gzj/selfext/assets/wrapper/extract"
 )
 
 //go:embed go/{{.GO}}
@@ -39,7 +40,7 @@ func AssetsGoExtract(dst string){
         log.Println(err)
     }
 
-	err = archiver.Unarchive(dstArch, filepath.Join(dst, "go"))
+	err = extract.Unarchive(dstArch, filepath.Join(dst, "go"))
 	if err != nil {
 		log.Println(err)
 	}
@@ -58,7 +59,7 @@ func AssetsWrapperExtract(dst string){
         log.Println(err)
     }
 
-	err = archiver.Unarchive(dstArch, filepath.Join(dst, "wrapper"))
+	err = extract.Unarchive(dstArch, filepath.Join(dst, "wrapper"))
 	if err != nil {
 		log.Println(err)
 	}

@@ -50,3 +50,7 @@ This will generate `example.zip.exe`, which extracts `example.zip` into the `exa
 ## License
 
 This project is licensed under the MIT License. See the [LICENSE](https://github.com/GZJ/selfext/blob/master/LICENSE) file for details.
+
+## Archive extraction security
+
+Extraction uses `github.com/mholt/archives` and Go 1.27.3's `os.Root` to confine filesystem writes to the destination. Regular files and directories are supported; symbolic links, hard-link entries, special files, unsafe paths, and overwriting existing files are rejected. Archives containing these entries must be repackaged as regular files. This also protects against a pre-existing destination link redirecting extraction. Tests: `go test ./assets/wrapper/extract`. The wrapper archive includes the same extraction package used for the embedded SDK.

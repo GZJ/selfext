@@ -100,7 +100,7 @@ generate_wrapper:
 	mv go.mod_ go.mod && \
 	go mod tidy && \
 	go mod vendor && \
-	7z a $(Wrapper_Arch) go.mod go.sum wrapper_generator.go vendor -bso0 -bse0 && \
+	7z a $(Wrapper_Arch) go.mod go.sum wrapper_generator.go extract vendor -bso0 -bse0 && \
 	mv go.mod go.mod_ 
 
 # ---------------------------- go run generate assets.go ------------------------------------------
