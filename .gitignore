@@ -1,12 +1,26 @@
+# Go binaries and release artifacts (including plain `go build .`).
+/selfext
+/selfext.exe
 /target/
 /release/
-__pycache__/
+
+# PyInstaller outputs, whether invoked from the root or gui/.
 /build/
+/dist/
 /*.spec
-
-/.cache/
-
-/gui/.venv/
-/gui/dist/
 /gui/build/
-/gui/*.egg-info/
+/gui/dist/
+/gui/*.spec
+
+# Local development caches and Python environments.
+/.cache/
+/gui/.venv/
+__pycache__/
+*.py[cod]
+/gui/**/*.egg-info/
+
+# Desktop filesystem metadata.
+.DS_Store
+Thumbs.db
+
+# Keep gui/uv.lock, gui/.python-version and internal/stubs/data/*.gz tracked.
