@@ -1,7 +1,12 @@
 /target/
 /release/
-/__pycache__/
+__pycache__/
 /build/
 /*.spec
 
 /.cache/
+
+/gui/.venv/
+/gui/dist/
+/gui/build/
+/gui/*.egg-info/
