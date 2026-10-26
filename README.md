@@ -7,7 +7,7 @@ Selfext ships precompiled extractors for eight OS/architecture combinations. It
 streams the original archive into the selected executable: **no Go SDK, compiler,
 network connection, or runtime dependency downloads are needed when packaging.**
 
-![selfextg](./selfextg.png)
+![selfextg](./gui/assets/screenshot.png)
 
 ## Install with Go
 
@@ -78,8 +78,8 @@ Supported targets:
 | macOS (`darwin`) | amd64, arm64 |
 
 A generated executable runs on its selected target, not all platforms at once.
-The Python/PyQt5 GUI is optional: install PyQt5, put `selfext` on PATH, and run
-`python selfextg.py`. It calls the same packager and supports drag and drop.
+The optional [PySide6 GUI](gui/README.md) is an independent uv project in `gui/`.
+Run `make gui-run` to build the CLI and launch the drag-and-drop interface.
 
 ## Build from source
 
@@ -89,6 +89,9 @@ It does not download or embed a separate SDK.
 
 ```sh
 make build       # build the native packager using the bundled extractors
+make gui         # bundle the native CLI and PySide6 GUI using uv/PyInstaller
+make gui-run     # build the CLI and launch the GUI through uv
+make gui-test    # run offscreen GUI integration tests
 make test        # unit and extraction security tests
 make release     # standalone packagers for all eight host targets in release/
 ```
@@ -98,6 +101,24 @@ Without Make, from the repository root:
 ```sh
 go build -trimpath -o target/ .
 ```
+
+### Build the GUI
+
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then run:
+
+```sh
+make gui-run     # launch from source with locked dependencies
+make gui         # build a standalone GUI including the CLI, Python, and Qt
+```
+
+GUI code, dependency metadata, lockfile, and tests live under `gui/`. uv manages
+its Python 3.13 environment in `gui/.venv/`; PySide6 is the runtime dependency and
+PyInstaller is in the optional `build` dependency group. See the
+[GUI documentation](gui/README.md) for platform requirements, CLI discovery, and
+dependency updates. `make clean` removes build outputs while preserving the
+Python environment and checked-in extractor resources.
+
+### Maintain bundled extractors
 
 Precompiled extractors in `internal/stubs/data/*.gz` are version-controlled and
 included in Go module releases. `go build`, `go install`, `make build`, and
@@ -164,7 +185,7 @@ Only run self-extracting executables from sources you trust.
 - `internal/bundle`: container format, checksum, Mach-O signature relocation.
 - `internal/extract`: shared confined archive extraction.
 - `internal/stubs`: embedded precompiled executables.
-- `selfextg.py`: optional PyQt5 GUI.
+- `gui/`: independent uv-managed PySide6 GUI, lockfile, tests, and packaging entry point.
 
 ## License
 
