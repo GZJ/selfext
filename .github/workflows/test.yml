@@ -19,3 +19,14 @@ jobs:
         run: go install .
       - run: go test -tags=integration ./...
       - run: go vet ./...
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: "0.13.4"
+          enable-cache: true
+          cache-dependency-glob: gui/uv.lock
+      - name: Build native CLI for GUI tests
+        run: go build -o target/ .
+        env:
+          CGO_ENABLED: "0"
+      - name: Test PySide6 GUI with locked dependencies
+        run: uv run --project gui --locked python -m unittest discover -s gui/tests -v
