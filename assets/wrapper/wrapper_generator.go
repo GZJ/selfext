@@ -23,7 +23,7 @@ import (
     "path/filepath"
     _ "embed"
 
-	"github.com/mholt/archiver/v3"
+	"github.com/gzj/selfextw/extract"
 )
 
 //go:embed {{.File}}
@@ -47,7 +47,7 @@ func main() {
         log.Fatal(err)
     }
 
-	err = archiver.Unarchive(filepath.Join(tmpDir, "{{.Src}}"), "{{.Dst}}")
+	err = extract.Unarchive(filepath.Join(tmpDir, "{{.Src}}"), "{{.Dst}}")
 	if err != nil {
 		log.Fatal(err)
 	}
